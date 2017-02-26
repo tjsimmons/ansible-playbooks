@@ -1,9 +1,10 @@
-- hosts: "{{ target }}"
+- hosts: all
+  gather_facts: no
   pre_tasks:
+    - name: ensure python2 is installed
+      raw: apt install -y python-simplejson
     - name: ensure aptitude is installed
       raw: apt install -y aptitude
-    - name: ensure python2 is installed
-      raw: apt install -y python-minimal
   tasks:
     - name: update all installed packages
       apt:
