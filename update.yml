@@ -1,12 +1,9 @@
 - hosts: all
   gather_facts: no
-  pre_tasks:
-    - name: ensure python2 is installed
-      raw: apt install -y python-simplejson
-    - name: ensure aptitude is installed
-      raw: apt install -y aptitude
   tasks:
     - name: update all installed packages
+      become: true
+      become_user: root
       apt:
         update_cache: yes
         upgrade: yes

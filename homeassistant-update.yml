@@ -1,0 +1,13 @@
+- hosts: homeassistant
+  gather_facts: no
+  tasks:
+    - name: update pip
+      pip:
+        name: pip
+        extra_args: --upgrade
+        virtualenv: /srv/homeassistant
+    - name: update homeassistant via pip
+      pip:
+        name: homeassistant
+        extra_args: --upgrade
+        virtualenv: /srv/homeassistant

@@ -1,1 +1,3 @@
-update.retry
+syntax: glob
+*.retry
+.vault_pass
