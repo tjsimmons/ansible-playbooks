@@ -19,4 +19,7 @@
         dest: /home/homeassistant/.homeassistant
         clone: no
         update: yes
-
+    - name: restart homeassistant
+      become: true
+      become_user: root
+      command: systemctl restart home-assistant@homeassistant
