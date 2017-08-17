@@ -1,4 +1,6 @@
 - hosts: homeassistant
+  become: true
+  become_user: homeassistant
   gather_facts: no
   tasks:
     - name: update pip
@@ -11,3 +13,10 @@
         name: homeassistant
         extra_args: --upgrade
         virtualenv: /srv/homeassistant
+    - name: update configs with latest
+      git:
+        repo: https://github.com/tjsimmons/homeassistant-configs.git
+        dest: /home/homeassistant/.homeassistant
+        clone: no
+        update: yes
+
