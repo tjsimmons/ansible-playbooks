@@ -19,6 +19,7 @@
         dest: /home/homeassistant/.homeassistant
         clone: no
         update: yes
+        force: yes
     - name: restart homeassistant
       become: true
       become_user: root
