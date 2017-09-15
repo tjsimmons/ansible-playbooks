@@ -15,7 +15,7 @@
         virtualenv: /srv/homeassistant
     - name: update configs with latest
       git:
-        repo: https://github.com/tjsimmons/homeassistant-configs.git
+        repo: https://tjsimmons@bitbucket.org/tjsimmons/homeassistant-configs.git
         dest: /home/homeassistant/.homeassistant
         clone: no
         update: yes
