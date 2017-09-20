@@ -1,0 +1,18 @@
+- hosts: kubernetes
+  become: true
+  become_user: root
+  gather_facts: no
+  tasks:
+    - name: add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        id: 0EBFCD88
+        state: present
+    - name: add Docker repo
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+    - name: install Docker
+      apt:
+        name: docker-ce
+        update-cache: yes
+        state: present
