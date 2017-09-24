@@ -1,0 +1,52 @@
+- hosts: rancher
+  become_user: root
+  gather_facts: no
+  tasks:
+    - name: add Docker GPG key
+      become: true
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        id: 0EBFCD88
+        state: present
+    - name: add Docker repo
+      become: true
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable    
+    - name: install Docker
+      become: true
+      apt:
+        name: docker-ce
+        update-cache: yes
+        state: present
+
+- hosts: rancher-master
+  become_user: root
+  tasks:
+    - name: add "{{ ansible_env.USER }}" to docker group
+      become: true
+      user:
+        name: "{{ ansible_env.USER }}"
+        groups: docker
+        append: yes
+    - name: install pip
+      become: true
+      apt:
+        name: python-pip
+        update-cache: yes
+        state: present
+    - name: update pip
+      pip:
+        name: pip
+        state: latest
+    - name: install docker-py
+      pip:
+        name: docker-py
+        state: latest
+    - name: start Rancher Server
+      docker_container:
+        name: rancher
+        image: rancher/server:stable
+        published_ports:
+          - 8080:8080
+        restart_policy: unless-stopped
+        state: started
