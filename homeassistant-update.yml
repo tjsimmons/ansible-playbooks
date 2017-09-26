@@ -15,7 +15,7 @@
         virtualenv: /srv/homeassistant
     - name: update configs with latest
       git:
-        repo: git@github.com:tjsimmons/ansible-playbooks.git
+        repo: git@github.com:tjsimmons/homeassistant-configs.git
         dest: /home/homeassistant/.homeassistant
         clone: no
         update: yes

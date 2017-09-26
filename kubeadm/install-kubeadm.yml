@@ -1,0 +1,71 @@
+- hosts: kubernetes
+  become: true
+  become_user: root
+  gather_facts: no
+  tasks:
+    - name: add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        id: 0EBFCD88
+        state: present
+    - name: add Docker repo
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
+    - name: install Docker
+      apt:
+        name: docker-ce
+        update-cache: yes
+        state: present
+    - name: add kubernetes gpg key
+      apt_key:
+        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+        state: present
+    - name: add kubernetes apt apt_repository
+      apt_repository:
+        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+    - name: install kubectl, kubelet, and kubeadm
+      apt:
+        name: "{{ item }}"
+        update-cache: yes
+        state: present
+      with_items:
+        - kubectl
+        - kubelet
+        - kubeadm
+
+- hosts: kubernetes-master
+  become_user: root
+  tasks:
+    - name: check if kubeadm already installed
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_installed
+    - name: check kubadm_conf value
+      debug:
+        var: kubeadm_installed.stat.exists
+    - name: "initialize kubeadm with flannel"
+      become: true
+      command: kubeadm init --pod-network-cidr=10.244.0.0/16
+      when: kubeadm_installed == false
+      register: kubeadm_output
+    - name: "create .kube directory"
+      file:
+        path: "{{ ansible_env.HOME }}/.kube"
+        owner: "{{ ansible_env.USER }}"
+        group: "{{ ansible_env.USER }}"
+        state: directory
+      when: kubeadm_installed == false
+    - name: "copy kube admin.conf to local .kube"
+      copy:
+        become: true
+        remote_src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_env.HOME }}/.kube/config"
+      when: kubeadm_installed == false
+    - name: "install flannel networking"
+      become: true
+      command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    - name: "check kubeadm_output"
+      debug:
+        var: kubeadm_output
+
+- hosts: kubernetes-node
