@@ -1,0 +1,1 @@
+kubeadm join --token da1240.7ea81260617b9fd0 10.0.1.39:6443

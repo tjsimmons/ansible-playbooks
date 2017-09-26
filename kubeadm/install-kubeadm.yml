@@ -36,14 +36,10 @@
 - hosts: kubernetes-master
   become_user: root
   tasks:
-    - name: check if kubeadm already installed
-      stat:
-        path: /etc/kubernetes/admin.conf
-      register: kubeadm_installed
     - name: "initialize kubeadm with flannel CIDR"
       become: true
       command: kubeadm init --pod-network-cidr=10.244.0.0/16
-      when: kubeadm_installed.stat.exists == false
+      when: ansible_local.kubeadm is undefined
       register: kubeadm_output
     - name: "create .kube directory"
       file:
@@ -51,29 +47,66 @@
         owner: "{{ ansible_env.USER }}"
         group: "{{ ansible_env.USER }}"
         state: directory
-      when: kubeadm_installed.stat.exists == false
+      when: ansible_local.kubeadm is undefined
     - name: "copy kube admin.conf to local .kube"
       become: true
       copy:
         remote_src: true
         src: /etc/kubernetes/admin.conf
         dest: "{{ ansible_env.HOME }}/.kube/config"
-      when: kubeadm_installed.stat.exists == false
+      when: ansible_local.kubeadm is undefined
     - name: "install flannel networking"
       command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-      when: kubeadm_installed.stat.exists == false
-    - name: "kubadm_output"
-      debug:
-        var: kubeadm_output
-    - name: "save join command"
-      set_fact: 
-        kubeadm_join: "{{ kubeadm_output.stdout | regex_findall('kubeadm join --token .*', '\\1') }}"
-      when: kubeadm_installed.stat.exists == false
+      when: ansible_local.kubeadm is undefined
+    - name: "save join command to disk"
+      copy:
+        content: "{{ kubeadm_output.stdout | regex_findall('kubeadm join --token .*', '\\1') | join('') }}"
+        dest: "{{ ansible_env.HOME }}/kubeadm.join"
+        owner: "{{ ansible_env.USER }}"
+      when: ansible_local.kubeadm is undefined
+    - name: "pull down kubeadm.join"
+      fetch:
+        src: "{{ ansible_env.HOME }}/kubeadm.join"
+        dest: kubeadm.join
+        flat: true
+    - name: "copy kubernetes config file to localhost"
+      become: true
+      fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: ~/.kube/config
+        flat: true
+    - name: "add kubeadm fact to the system"
+      copy:
+        src: facts.d/kubeadm.fact
+        dest: /etc/ansible/facts.d/
+        owner: "{{ ansible_env.USER }}"
+      become: true
+      when: ansible_local.kubeadm is undefined
 
 - hosts: kubernetes-node
   become_user: root
-  become: true
   tasks:
-    - name: "foo"
-      debug:
-        var: hostvars
+    - name: "place kubeadm.join command"
+      copy:
+        src: kubeadm.join
+        dest: "{{ ansible_env.HOME }}/kubeadm.join"
+        owner: "{{ ansible_env.USER }}"
+      when: ansible_local.kubeadm is undefined
+    - name: "store kubeadm join command"
+      command: "cat {{ ansible_env.HOME }}/kubeadm.join"
+      register: kubeadm_join
+      when: ansible_local.kubeadm is undefined
+    - name: "execute kubeadm join"
+      command: "{{ kubeadm_join.stdout }}"
+      become: true
+      when: ansible_local.kubeadm is undefined
+      register: join_output
+    - name: "add kubeadm fact to the system"
+      copy:
+        src: facts.d/kubeadm.fact
+        dest: /etc/ansible/facts.d/
+        owner: "{{ ansible_env.USER }}"
+      become: true
+      when: ansible_local.kubeadm is undefined
+
+
