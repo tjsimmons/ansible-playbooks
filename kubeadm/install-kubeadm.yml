@@ -40,9 +40,6 @@
       stat:
         path: /etc/kubernetes/admin.conf
       register: kubeadm_installed
-    - name: check kubadm_conf value
-      debug:
-        var: kubeadm_installed.stat.exists
     - name: "initialize kubeadm with flannel CIDR"
       become: true
       command: kubeadm init --pod-network-cidr=10.244.0.0/16
@@ -65,8 +62,18 @@
     - name: "install flannel networking"
       command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
       when: kubeadm_installed.stat.exists == false
-    - name: "check kubeadm_output for join command"
+    - name: "kubadm_output"
       debug:
-        var: "{{ kubeadm_output | regex_search('(kubeadm join --token)') }}"
+        var: kubeadm_output
+    - name: "save join command"
+      set_fact: 
+        kubeadm_join: "{{ kubeadm_output.stdout | regex_findall('kubeadm join --token .*', '\\1') }}"
+      when: kubeadm_installed.stat.exists == false
 
 - hosts: kubernetes-node
+  become_user: root
+  become: true
+  tasks:
+    - name: "foo"
+      debug:
+        var: hostvars
