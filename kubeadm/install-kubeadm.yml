@@ -20,7 +20,7 @@
       apt_key:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
         state: present
-    - name: add kubernetes apt apt_repository
+    - name: add kubernetes apt repository
       apt_repository:
         repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
     - name: install kubectl, kubelet, and kubeadm
@@ -43,10 +43,10 @@
     - name: check kubadm_conf value
       debug:
         var: kubeadm_installed.stat.exists
-    - name: "initialize kubeadm with flannel"
+    - name: "initialize kubeadm with flannel CIDR"
       become: true
       command: kubeadm init --pod-network-cidr=10.244.0.0/16
-      when: kubeadm_installed == false
+      when: kubeadm_installed.stat.exists == false
       register: kubeadm_output
     - name: "create .kube directory"
       file:
@@ -54,18 +54,19 @@
         owner: "{{ ansible_env.USER }}"
         group: "{{ ansible_env.USER }}"
         state: directory
-      when: kubeadm_installed == false
+      when: kubeadm_installed.stat.exists == false
     - name: "copy kube admin.conf to local .kube"
-      copy:
-        become: true
-        remote_src: /etc/kubernetes/admin.conf
-        dest: "{{ ansible_env.HOME }}/.kube/config"
-      when: kubeadm_installed == false
-    - name: "install flannel networking"
       become: true
+      copy:
+        remote_src: true
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_env.HOME }}/.kube/config"
+      when: kubeadm_installed.stat.exists == false
+    - name: "install flannel networking"
       command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
-    - name: "check kubeadm_output"
+      when: kubeadm_installed.stat.exists == false
+    - name: "check kubeadm_output for join command"
       debug:
-        var: kubeadm_output
+        var: "{{ kubeadm_output | regex_search('(kubeadm join --token)') }}"
 
 - hosts: kubernetes-node
