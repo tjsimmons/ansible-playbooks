@@ -1,5 +1,4 @@
 syntax: glob
+
 *.retry
-.vault_pass
-*.DS_Store
 *.join
