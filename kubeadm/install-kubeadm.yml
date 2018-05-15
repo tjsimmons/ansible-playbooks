@@ -1,7 +1,7 @@
 - hosts: kubernetes
   become: true
   become_user: root
-  gather_facts: no
+  gather_facts: yes
   tasks:
     - name: add Docker GPG key
       apt_key:
@@ -13,9 +13,10 @@
         repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
     - name: install Docker
       apt:
-        name: docker-ce
+        name: "docker-ce=17.03.2*"
         update-cache: yes
         state: present
+        force: yes
     - name: add kubernetes gpg key
       apt_key:
         url: https://packages.cloud.google.com/apt/doc/apt-key.gpg

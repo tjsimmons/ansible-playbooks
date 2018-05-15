@@ -1,6 +1,13 @@
 - hosts: all
-  gather_facts: no
   tasks:
+    - name: ensure all SSH keys are on system
+      authorized_key:
+        user: "{{ ansible_env.USER }}"
+        state: present
+        key: "{{ item }}"
+      with_file: 
+        - keys/primary
+        - keys/backup
     - name: update all installed packages
       become: true
       become_user: root

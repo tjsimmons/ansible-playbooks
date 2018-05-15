@@ -46,7 +46,6 @@
         name: rancher
         image: rancher/server:preview
         published_ports:
-          - 80:80
-          - 443:443
+          - 8080:8080
         restart_policy: unless-stopped
         state: started
