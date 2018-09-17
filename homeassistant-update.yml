@@ -7,12 +7,10 @@
       pip:
         name: pip
         extra_args: --upgrade
-        virtualenv: /srv/homeassistant
     - name: update homeassistant via pip
       pip:
         name: homeassistant
         extra_args: --upgrade
-        virtualenv: /srv/homeassistant
     - name: update configs with latest
       git:
         repo: git@github.com:tjsimmons/homeassistant-configs.git
@@ -23,4 +21,4 @@
     - name: restart homeassistant
       become: true
       become_user: root
-      command: systemctl restart home-assistant@homeassistant
+      command: systemctl restart homeassistant

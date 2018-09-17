@@ -8,9 +8,11 @@
       with_file: 
         - keys/primary
         - keys/backup
+        - keys/gylfaginning
     - name: update all installed packages
       become: true
       become_user: root
       apt:
         update_cache: yes
         upgrade: dist
+        autoremove: yes
