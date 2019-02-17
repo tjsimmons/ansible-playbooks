@@ -1,6 +1,4 @@
 - hosts: homeassistant
-  become: true
-  become_user: homeassistant
   gather_facts: no
   tasks:
     - name: update pip
