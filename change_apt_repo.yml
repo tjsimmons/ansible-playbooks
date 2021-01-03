@@ -3,5 +3,5 @@
     - name: change apt repo if needed
       replace:
         path: /etc/apt/sources.list
-        regexp: '(aptmirror)'
+        regexp: '(apt-repo)'
         replace: 'mirror.math.princeton.edu/pub'

@@ -6,8 +6,10 @@
         state: present
         key: "{{ item }}"
       with_file: 
-        - keys/primary
-        - keys/backup
+        - keys/yubikey5nfc
+        - keys/yubikey4
+        - keys/yubikey4c-1
+        - keys/yubikey4c-2
         - keys/gylfaginning
     - name: update all installed packages
       become: true
