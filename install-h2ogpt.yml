@@ -1,0 +1,77 @@
+- name: Install h2ogpt
+  hosts: h2o
+  tasks:
+    - name: Install requirements
+      become: true
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - gcc
+          - python3.10-dev
+          - python3-pip
+          - git
+          - libmagic-dev
+          - poppler-utils
+          - tesseract-ocr
+          - libtesseract-dev
+          - libreoffice
+          - python3.10-venv
+        update_cache: true
+        state: present
+    - name: Install pipx and setuptools via pip
+      become: true
+      ansible.builtin.pip:
+        name:
+          - pipx
+          - setuptools
+        state: present
+    - name: Install virtualenv via pipx
+      community.general.pipx:
+        name: virtualenv
+        state: present
+    - name: Add virtualenv to shell PATH
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:{{ ansible_env.HOME }}/.local/bin"
+        state: present
+    - name: Test for virtualenv in environment PATH
+      ansible.builtin.shell: grep -c ":{{ ansible_env.HOME }}/.local/bin" /etc/environment || true
+      register: test_grep
+    - name: Add virtualenv to environment PATH
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        backrefs: true
+        regexp: "(\/[^\"]*)"
+        line: "\\1:{{ ansible_env.HOME }}/.local/bin"
+        state: present
+      when: test_grep.stdout == "0"
+    - name: Clone h2ogpt repository
+      ansible.builtin.git:
+        repo: https://github.com/h2oai/h2ogpt.git
+        dest: /usr/share/h2ogpt
+        clone: true
+    - name: Create and activate h2o virtualenv and install requirements, including optionals (cpu only)
+      ansible.builtin.pip:
+        chdir: /usr/share/h2ogpt
+        virtualenv: h2ogpt
+        extra_args: --extra-index https://download.pytorch.org/whl/cpu
+        requirements: "{{ item }}"
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
+      loop:
+        - requirements.txt
+        - reqs_optional/requirements_optional_langchain.txt
+        - reqs_optional/requirements_optional_gpt4all.txt
+        - reqs_optional/requirements_optional_langchain.gpllike.txt
+        - reqs_optional/requirements_optional_langchain.urls.txt
+    - name: Run Python module nltk.downloader
+      ansible.builtin.shell:
+        chdir: /usr/share/h2ogpt
+        cmd: "source h2ogpt/bin/activate && python3 -m nltk.downloader all && deactivate"
+        executable: /usr/bin/bash
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
+
+# to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
