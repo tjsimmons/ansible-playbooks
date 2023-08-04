@@ -1,5 +1,8 @@
 - name: Install h2ogpt
   hosts: h2o
+  vars_prompt:
+    - name: api_token
+      prompt: Enter the huggingface.co API token
   tasks:
     - name: Install requirements
       become: true
@@ -18,12 +21,13 @@
           - python3.10-venv
         update_cache: true
         state: present
-    - name: Install pipx and setuptools via pip
+    - name: Install pipx, setuptools, and pytesseract via pip
       become: true
       ansible.builtin.pip:
         name:
           - pipx
           - setuptools
+          - pytesseract
         state: present
     - name: Install virtualenv via pipx
       community.general.pipx:
@@ -73,5 +77,23 @@
         executable: /usr/bin/bash
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
+    - name: Download LLamA2 from TheBloke
+      ansible.builtin.get_url:
+        url: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q8_0.bin
+        dest: /usr/share/h2ogpt/llama-2-7b-chat.ggmlv3.q8_0.bin
+        mode: 644
+    - name: Set the git credential helper as the default, so we can store the huggingface-cli token
+      community.general.git_config:
+        name: credential.helper
+        value: store
+        scope: global
+    - name: Run make_db.py
+      ansible.builtin.shell:
+        chdir: /usr/share/h2ogpt
+        cmd: "source h2ogpt/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
+         python3 src/make_db.py --download_all=true --enable_ocr=true && deactivate"
+        executable: /usr/bin/bash
+
+# CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTLLATION
 
 # to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
