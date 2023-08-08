@@ -1,0 +1,94 @@
+- name: Install necessary drivers for CUDA on Ubuntu 22.04 under WSL2, meant to be run in the WSL installation hosting h2ogpt
+  hosts: "{{ variable_host | default('h2o-wsl') }}"
+  # from https://ubuntu.com/tutorials/enabling-gpu-acceleration-on-ubuntu-on-wsl2-with-the-nvidia-cuda-platform
+
+  tasks:
+    - name: Ensure package path exists
+      ansible.builtin.file:
+        path: /etc/apt/preferences.d/cuda-repository-pin-0600
+        state: directory
+      become: true
+    - name: Download package from Nvidia
+      ansible.builtin.get_url:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
+        dest: /etc/apt/preferences.d/cuda-repository-pin-0600/cuda-wsl-ubuntu.pin
+        mode: 744
+      become: true
+    - name: Add Nvidia GPG key
+      ansible.builtin.apt_key:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/3bf863cc.pub
+        id: 3bf863cc
+        state: present
+      become: true
+    - name: Add Nvidia apt repository
+      ansible.builtin.apt_repository:
+        repo: deb https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/ /
+      become: true
+    - name: Install CUDA
+      ansible.builtin.apt:
+        name: cuda
+        state: present
+        update_cache: true
+      become: true
+    - name: Add CUDA to shell PATH
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:/usr/local/cuda/bin"
+        state: present
+      become: true
+    - name: Test for CUDA in environment PATH
+      ansible.builtin.shell: grep -c ":/usr/local/cuda/bin" /etc/environment || true
+      register: test_grep
+    - name: Add CUDA to environment PATH
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        backrefs: true
+        regexp: "(PATH=\/[^\"]*)"
+        line: "\\1:/usr/local/cuda/bin"
+        state: present
+      when: test_grep.stdout == "0"
+      become: true
+    - name: Clone bitsandbytes
+      ansible.builtin.git:
+        repo: https://github.com/timdettmers/bitsandbytes.git
+        dest: "{{ ansible_env.HOME }}/bitsandbytes"
+        clone: true
+        version: 0.41.0
+    - name: Build bitsandbytes
+      community.general.make:
+        chdir: "{{ ansible_env.HOME }}/bitsandbytes"
+        target: cuda12x
+        params:
+          CUDA_VERSION: 122
+    - name: Install bitsandbytes via python
+      ansible.builtin.command:
+        chdir: "{{ ansible_env.HOME }}/bitsandbytes"
+        cmd: /usr/bin/python3 setup.py install
+      become: true
+    - name: Set up environment variables for CUDA
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: "{{ item }}"
+        state: present
+      loop:
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
+        - export CUDA_HOME=/usr/local/cuda
+        - export PATH=$PATH:/usr/local/cuda/bin/
+      become: true
+    - name: Ensure CUDA works by compiling a sample app
+      ansible.builtin.git:
+        repo: https://github.com/nvidia/cuda-samples.git
+        dest: "{{ ansible_env.HOME }}/cuda-samples"
+        clone: true
+        version: v12.2
+    - name: Build the sample app
+      community.general.make:
+        chdir: "{{ ansible_env.HOME }}/cuda-samples/Samples/1_Utilities/deviceQuery"
+        make: 
+    - name: Verify app works
+      ansible.builtin.command:
+        chdir: "{{ ansible_env.HOME }}/cuda-samples/Samples/1_Utilities/deviceQuery"
+        cmd: "./deviceQuery"
+      register: command_output
+    - ansible.builtin.debug:
+        var: command_output.stdout_lines

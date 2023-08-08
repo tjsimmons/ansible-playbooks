@@ -1,11 +1,11 @@
 - name: Install h2ogpt
-  hosts: h2o
+  hosts: "{{ variable_host | default('h2o') }}"
+  # can override the host by using ansible-playbook install-h2ogpt.yml --extra-vars "variable_host={target}"
   vars_prompt:
     - name: api_token
       prompt: Enter the huggingface.co API token
   tasks:
     - name: Install requirements
-      become: true
       ansible.builtin.apt:
         name:
           - build-essential
@@ -21,8 +21,8 @@
           - python3.10-venv
         update_cache: true
         state: present
-    - name: Install pipx, setuptools, and pytesseract via pip
       become: true
+    - name: Install pipx, setuptools, and pytesseract via pip
       ansible.builtin.pip:
         name:
           - pipx
@@ -34,33 +34,43 @@
         name: virtualenv
         state: present
     - name: Add virtualenv to shell PATH
-      become: true
       ansible.builtin.lineinfile:
         path: /etc/profile
         line: "export PATH=$PATH:{{ ansible_env.HOME }}/.local/bin"
         state: present
+      become: true
     - name: Test for virtualenv in environment PATH
       ansible.builtin.shell: grep -c ":{{ ansible_env.HOME }}/.local/bin" /etc/environment || true
       register: test_grep
     - name: Add virtualenv to environment PATH
-      become: true
       ansible.builtin.lineinfile:
         path: /etc/environment
         backrefs: true
-        regexp: "(\/[^\"]*)"
+        regexp: "(PATH=\/[^\"]*)"
         line: "\\1:{{ ansible_env.HOME }}/.local/bin"
         state: present
       when: test_grep.stdout == "0"
+      become: true
     - name: Clone h2ogpt repository
       ansible.builtin.git:
         repo: https://github.com/h2oai/h2ogpt.git
         dest: /usr/share/h2ogpt
         clone: true
-    - name: Create and activate h2o virtualenv and install requirements, including optionals (cpu only)
+        force: true
+      become: true
+    - name: Change owner of /usr/share/h2ogpt to current user
+      ansible.builtin.file:
+        dest: /usr/share/h2ogpt
+        owner: "{{ ansible_env.USER }}"
+        group: "{{ ansible_env.USER }}"
+        mode: u+rwx
+        recurse: true
+      become: true
+    - name: Create and activate h2o virtualenv and install requirements, including optionals (GPU and CPU)
       ansible.builtin.pip:
         chdir: /usr/share/h2ogpt
         virtualenv: h2ogpt
-        extra_args: --extra-index https://download.pytorch.org/whl/cpu
+        extra_args: --extra-index https://download.pytorch.org/whl/nightly
         requirements: "{{ item }}"
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
@@ -70,6 +80,25 @@
         - reqs_optional/requirements_optional_gpt4all.txt
         - reqs_optional/requirements_optional_langchain.gpllike.txt
         - reqs_optional/requirements_optional_langchain.urls.txt
+    - name: Remove pip modules to be installed standalone
+      ansible.builtin.pip:
+        chdir: /usr/share/h2ogpt
+        virtualenv: h2ogpt
+        state: absent
+        name:
+          - auto-gptq
+          - exllama
+          - llama-cpp-python
+          - llama-cpp-python-cuda
+    - name: Install standalone pip modules
+      ansible.builtin.pip:
+        chdir: /usr/share/h2ogpt
+        virtualenv: h2ogpt
+        extra_args: --use-deprecated=legacy-resolver --no-cache-dir
+        name:
+          - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
+          - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
+          - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
     - name: Run Python module nltk.downloader
       ansible.builtin.shell:
         chdir: /usr/share/h2ogpt
@@ -81,7 +110,16 @@
       ansible.builtin.get_url:
         url: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q8_0.bin
         dest: /usr/share/h2ogpt/llama-2-7b-chat.ggmlv3.q8_0.bin
-        mode: 644
+        owner: "{{ ansible_env.USER }}"
+        group: "{{ ansible_env.USER }}"
+        mode: u+rwx
+    - name: Download h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq from TheBloke
+      ansible.builtin.get_url:
+        url: https://huggingface.co/TheBlok/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-GTPQ/resolve/main/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq.bin
+        dest: /usr/share/h2ogpt/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq.bin
+        owner: "{{ ansible_env.USER }}"
+        group: "{{ ansible_env.USER }}"
+        mode: u+rwx
     - name: Set the git credential helper as the default, so we can store the huggingface-cli token
       community.general.git_config:
         name: credential.helper
@@ -90,10 +128,10 @@
     - name: Run make_db.py
       ansible.builtin.shell:
         chdir: /usr/share/h2ogpt
-        cmd: "source h2ogpt/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
-         python3 src/make_db.py --download_all=true --enable_ocr=true && deactivate"
+        cmd:
+          "source h2ogpt/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
+          python3 src/make_db.py --download_some=true --enable_ocr=true && deactivate"
         executable: /usr/bin/bash
-
-# CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTLLATION
+# CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTALLATION
 
 # to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
