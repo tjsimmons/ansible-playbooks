@@ -37,8 +37,8 @@
       ansible.builtin.lineinfile:
         path: /etc/environment
         backrefs: true
-        regexp: "(PATH=\/[^\"]*)"
-        line: "\\1:/usr/local/cuda/bin"
+        regexp: "^PATH=\"(.*)\""
+        line: "PATH=\"\\1:/usr/local/cuda/bin\""
         state: present
       when: test_grep.stdout == "0"
       become: true
