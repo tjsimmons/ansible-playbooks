@@ -113,13 +113,6 @@
         owner: "{{ ansible_env.USER }}"
         group: "{{ ansible_env.USER }}"
         mode: u+rwx
-    - name: Download h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq from TheBloke
-      ansible.builtin.get_url:
-        url: https://huggingface.co/TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-GTPQ/resolve/main/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq.bin
-        dest: /usr/share/h2ogpt/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-gptq.bin
-        owner: "{{ ansible_env.USER }}"
-        group: "{{ ansible_env.USER }}"
-        mode: u+rwx
     - name: Set the git credential helper as the default, so we can store the huggingface-cli token
       community.general.git_config:
         name: credential.helper
