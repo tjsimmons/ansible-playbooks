@@ -3,6 +3,45 @@
   # from https://ubuntu.com/tutorials/enabling-gpu-acceleration-on-ubuntu-on-wsl2-with-the-nvidia-cuda-platform
 
   tasks:
+    - name: Install some requirements
+      ansible.builtin.apt:
+        name:
+          - build-essential
+          - gcc
+          - python3.10-dev
+          - python3-pip
+          - git
+          - python3.10-venv
+      become: true
+    - name: Install pipx and setuptools via pip
+      ansible.builtin.pip:
+        name:
+          - pipx
+          - setuptools
+        state: present
+      become: true
+    - name: Install virtualenv via pipx
+      community.general.pipx:
+        name: virtualenv
+        state: present
+    - name: Add virtualenv to shell PATH
+      ansible.builtin.lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:{{ ansible_env.HOME }}/.local/bin"
+        state: present
+      become: true
+    - name: Test for virtualenv in environment PATH
+      ansible.builtin.shell: grep -c ":{{ ansible_env.HOME }}/.local/bin" /etc/environment || true
+      register: test_grep
+    - name: Add virtualenv to environment PATH
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        backrefs: true
+        regexp: "PATH=(\/[^\"]*)"
+        line: "PATH=\\1:{{ ansible_env.HOME }}/.local/bin"
+        state: present
+      when: test_grep.stdout == "0"
+      become: true
     - name: Ensure package path exists
       ansible.builtin.file:
         path: /etc/apt/preferences.d/cuda-repository-pin-0600
@@ -37,7 +76,7 @@
       ansible.builtin.lineinfile:
         path: /etc/environment
         backrefs: true
-        regexp: "^PATH=\"(.*)\""
+        regexp: '^PATH="(.*)"'
         line: "PATH=\"\\1:/usr/local/cuda/bin\""
         state: present
       when: test_grep.stdout == "0"
@@ -80,7 +119,7 @@
     - name: Build the sample app
       community.general.make:
         chdir: "{{ ansible_env.HOME }}/cuda-samples/Samples/1_Utilities/deviceQuery"
-        make: 
+        make:
     - name: Verify app works
       ansible.builtin.command:
         chdir: "{{ ansible_env.HOME }}/cuda-samples/Samples/1_Utilities/deviceQuery"
