@@ -76,7 +76,7 @@
       ansible.builtin.lineinfile:
         path: /etc/environment
         backrefs: true
-        regexp: '^PATH="(.*)"'
+        regexp: '^PATH=\"(.*)\"'
         line: "PATH=\"\\1:/usr/local/cuda/bin\""
         state: present
       when: test_grep.stdout == "0"
@@ -91,25 +91,25 @@
         - export CUDA_HOME=/usr/local/cuda
         - export PATH=$PATH:/usr/local/cuda/bin/
       become: true
-    - name: Clone bitsandbytes
-      ansible.builtin.git:
-        repo: https://github.com/timdettmers/bitsandbytes.git
-        dest: "{{ ansible_env.HOME }}/bitsandbytes"
-        clone: true
-        version: 0.41.0
-    - name: Build bitsandbytes
-      community.general.make:
-        chdir: "{{ ansible_env.HOME }}/bitsandbytes"
-        target: cuda12x
-        params:
-          CUDA_VERSION: 122
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/local/cuda/bin"
-    - name: Install bitsandbytes via python
-      ansible.builtin.command:
-        chdir: "{{ ansible_env.HOME }}/bitsandbytes"
-        cmd: /usr/bin/python3 setup.py install
-      become: true
+    #- name: Clone bitsandbytes
+    #  ansible.builtin.git:
+    #    repo: https://github.com/timdettmers/bitsandbytes.git
+    #    dest: "{{ ansible_env.HOME }}/bitsandbytes"
+    #    clone: true
+    #    version: 0.41.0
+    #- name: Build bitsandbytes
+    #  community.general.make:
+    #    chdir: "{{ ansible_env.HOME }}/bitsandbytes"
+    #    target: cuda12x
+    #    params:
+    #      CUDA_VERSION: 122
+    #  environment:
+    #    PATH: "{{ ansible_env.PATH }}:/usr/local/cuda/bin"
+    #- name: Install bitsandbytes via python
+    #  ansible.builtin.command:
+    #    chdir: "{{ ansible_env.HOME }}/bitsandbytes"
+    #    cmd: /usr/bin/python3 setup.py install
+    #  become: true
     - name: Ensure CUDA works by compiling a sample app
       ansible.builtin.git:
         repo: https://github.com/nvidia/cuda-samples.git

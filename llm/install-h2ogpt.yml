@@ -1,9 +1,9 @@
-- name: Install h2ogpt
-  hosts: "{{ variable_host | default('h2o') }}"
+- name: Install llm
+  hosts: "{{ variable_host | default('llm') }}"
   # can override the host by using ansible-playbook install-h2ogpt.yml --extra-vars "variable_host={target}"
-  vars_prompt:
-    - name: api_token
-      prompt: Enter the huggingface.co API token
+  #vars_prompt:
+  #  - name: api_token
+  #    prompt: Enter the huggingface.co API token
   tasks:
     - name: Install requirements
       ansible.builtin.apt:
@@ -28,7 +28,7 @@
         clone: true
         force: true
       become: true
-    - name: Change owner of /usr/share/h2ogpt to current user
+    - name: Change owner of /usr/share/llm to current user
       ansible.builtin.file:
         dest: /usr/share/llm
         owner: "{{ ansible_env.USER }}"
@@ -38,63 +38,74 @@
       become: true
     - name: Create and activate llm virtualenv and install requirements, including optionals (GPU and CPU)
       ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: llm-venv
-        extra_args: --extra-index https://download.pytorch.org/whl/nightly
+        chdir: /usr/share/llm/h2ogpt
+        virtualenv: /usr/share/llm/.llm-venv
+        extra_args: --extra-index https://download.pytorch.org/whl/nightly/cu121
         requirements: "{{ item }}"
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
       loop:
-        - h2ogpt/requirements.txt
-        - h2ogpt/reqs_optional/requirements_optional_langchain.txt
-        - h2ogpt/reqs_optional/requirements_optional_gpt4all.txt
-        - h2ogpt/reqs_optional/requirements_optional_langchain.gpllike.txt
-        - h2ogpt/reqs_optional/requirements_optional_langchain.urls.txt
-    - name: Remove pip modules to be installed standalone
-      ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: llm-venv
-        state: absent
-        name:
-          - auto-gptq
-          - exllama
-          - llama-cpp-python
-          - llama-cpp-python-cuda
-    - name: Install standalone pip modules
-      ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: llm-venv
-        extra_args: --use-deprecated=legacy-resolver --no-cache-dir
-        name:
-          - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
-          - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
-          - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
+        - requirements.txt
+        - reqs_optional/requirements_optional_langchain.txt
+        - reqs_optional/requirements_optional_gpt4all.txt
+        - reqs_optional/requirements_optional_langchain.gpllike.txt
+        - reqs_optional/requirements_optional_langchain.urls.txt
+    #- name: Remove pip modules to be installed standalone
+    #  ansible.builtin.pip:
+    #    chdir: /usr/share/llm
+    #    virtualenv: .llm-venv
+    #    state: absent
+    #    name:
+    #      - auto-gptq
+    #      - exllama
+    #      - llama-cpp-python
+    #      - llama-cpp-python-cuda
+    #- name: Install standalone pip modules
+    #  ansible.builtin.pip:
+    #    chdir: /usr/share/llm
+    #    virtualenv: .llm-venv
+    #    extra_args: --use-deprecated=legacy-resolver --no-cache-dir
+    #    name:
+    #      - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
+    #      - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
+    #      - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
     - name: Run Python module nltk.downloader
       ansible.builtin.shell:
-        chdir: /usr/share/llm
-        cmd: "source llm-venv/bin/activate && python3 -m nltk.downloader all && deactivate"
+        chdir: /usr/share/llm/h2ogpt
+        cmd: "source .llm-venv/bin/activate && python3 -m nltk.downloader all && deactivate"
         executable: /usr/bin/bash
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
-    - name: Download LLamA2 from TheBloke
-      ansible.builtin.get_url:
-        url: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q8_0.bin
-        dest: /usr/share/llm/h2ogpt/llama-2-7b-chat.ggmlv3.q8_0.bin
-        owner: "{{ ansible_env.USER }}"
-        group: "{{ ansible_env.USER }}"
-        mode: u+rwx
+    #- name: Download LLamA2 from TheBloke
+    #  ansible.builtin.get_url:
+    #    url: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q8_0.bin
+    #    dest: /usr/share/llm/h2ogpt/llama-2-7b-chat.ggmlv3.q8_0.bin
+    #    owner: "{{ ansible_env.USER }}"
+    #    group: "{{ ansible_env.USER }}"
+    #    mode: u+rwx
     - name: Set the git credential helper as the default, so we can store the huggingface-cli token
       community.general.git_config:
         name: credential.helper
         value: store
         scope: global
-    - name: Run make_db.py
-      ansible.builtin.shell:
-        chdir: /usr/share/llm/h2ogpt
-        cmd:
-          "source ../llm-venv/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
-          python3 src/make_db.py --download_some=true --enable_ocr=true && deactivate"
-        executable: /usr/bin/bash
+    - name: Clone text-generation-webui
+      ansible.builtin.git:
+        repo: https://github.com/oobabooga/text-generation-webui.git
+        dest: /usr/share/llm/text-generation-webui
+        clone: true
+        force: true
+    - name: Install text-generation-webui dependencies
+      ansible.builtin.pip:
+        chdir: /usr/share/llm/text-generation-webui
+        virtualenv: /usr/share/llm/.llm-venv
+        requirements: requirements.txt
+    #- name: Run make_db.py
+    #  ansible.builtin.shell:
+    #    chdir: /usr/share/llm/h2ogpt
+    #    cmd:
+    #      "source ../.llm-venv/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
+    #      python3 src/make_db.py --download_some=true --enable_ocr=true && deactivate"
+    #    executable: /usr/bin/bash
 # CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTALLATION
 
 # to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
