@@ -42,26 +42,9 @@
         state: present
       when: test_grep.stdout == "0"
       become: true
-    - name: Ensure package path exists
-      ansible.builtin.file:
-        path: /etc/apt/preferences.d/cuda-repository-pin-0600
-        state: directory
-      become: true
-    - name: Download package from Nvidia
-      ansible.builtin.get_url:
-        url: https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
-        dest: /etc/apt/preferences.d/cuda-repository-pin-0600/cuda-wsl-ubuntu.pin
-        mode: 744
-      become: true
-    - name: Add Nvidia GPG key
-      ansible.builtin.apt_key:
-        url: https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/3bf863cc.pub
-        id: 3bf863cc
-        state: present
-      become: true
-    - name: Add Nvidia apt repository
-      ansible.builtin.apt_repository:
-        repo: deb https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/ /
+    - name: Install Nvidia package
+      ansible.builtin.apt:
+        deb: https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
       become: true
     - name: Install CUDA
       ansible.builtin.apt:
