@@ -72,7 +72,7 @@
     - name: Run Python module nltk.downloader
       ansible.builtin.shell:
         chdir: /usr/share/llm/h2ogpt
-        cmd: "source .llm-venv/bin/activate && python3 -m nltk.downloader all && deactivate"
+        cmd: "source /usr/share/llm/.llm-venv/bin/activate && python3 -m nltk.downloader all && deactivate"
         executable: /usr/bin/bash
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
@@ -103,9 +103,23 @@
     #  ansible.builtin.shell:
     #    chdir: /usr/share/llm/h2ogpt
     #    cmd:
-    #      "source ../.llm-venv/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
+    #      "source /usr/share/llm/.llm-venv/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
     #      python3 src/make_db.py --download_some=true --enable_ocr=true && deactivate"
     #    executable: /usr/bin/bash
+    - name: Download various models for text-generation-webui
+      ansible.builtin.shell:
+        chdir: /usr/share/llm/text-generation-webui
+        cmd: "{{ item}}"
+        executable: /usr/bin/bash
+      loop:
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/OpenAssistant-Llama2-13B-Orca-v2-8K-3166-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/OpenChat_v3.2-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/CodeUp-Llama-2-13B-Chat-HF-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/OpenOrcaxOpenChat-Preview2-13B-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/Llama-2-13B-chat-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-40b-v2-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py amazon/FalconLite && deactivate
 # CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTALLATION
 
 # to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
