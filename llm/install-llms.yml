@@ -50,25 +50,6 @@
         - reqs_optional/requirements_optional_gpt4all.txt
         - reqs_optional/requirements_optional_langchain.gpllike.txt
         - reqs_optional/requirements_optional_langchain.urls.txt
-    #- name: Remove pip modules to be installed standalone
-    #  ansible.builtin.pip:
-    #    chdir: /usr/share/llm
-    #    virtualenv: .llm-venv
-    #    state: absent
-    #    name:
-    #      - auto-gptq
-    #      - exllama
-    #      - llama-cpp-python
-    #      - llama-cpp-python-cuda
-    #- name: Install standalone pip modules
-    #  ansible.builtin.pip:
-    #    chdir: /usr/share/llm
-    #    virtualenv: .llm-venv
-    #    extra_args: --use-deprecated=legacy-resolver --no-cache-dir
-    #    name:
-    #      - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
-    #      - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
-    #      - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
     - name: Run Python module nltk.downloader
       ansible.builtin.shell:
         chdir: /usr/share/llm/h2ogpt
@@ -76,13 +57,6 @@
         executable: /usr/bin/bash
       environment:
         PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
-    #- name: Download LLamA2 from TheBloke
-    #  ansible.builtin.get_url:
-    #    url: https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q8_0.bin
-    #    dest: /usr/share/llm/h2ogpt/llama-2-7b-chat.ggmlv3.q8_0.bin
-    #    owner: "{{ ansible_env.USER }}"
-    #    group: "{{ ansible_env.USER }}"
-    #    mode: u+rwx
     - name: Set the git credential helper as the default, so we can store the huggingface-cli token
       community.general.git_config:
         name: credential.helper
@@ -99,6 +73,82 @@
         chdir: /usr/share/llm/text-generation-webui
         virtualenv: /usr/share/llm/.llm-venv
         requirements: requirements.txt
+    - name: Remove pip modules to be installed standalone
+      ansible.builtin.pip:
+        chdir: /usr/share/llm
+        virtualenv: .llm-venv
+        state: absent
+        name:
+          - auto-gptq
+          - exllama
+          - llama-cpp-python
+          - llama-cpp-python-cuda
+    - name: Install standalone pip modules
+      ansible.builtin.pip:
+        chdir: /usr/share/llm
+        virtualenv: .llm-venv
+        extra_args: --use-deprecated=legacy-resolver --no-cache-dir
+        name:
+          - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
+          - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
+          - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
+    - name: Make a directory for langflow and langchain-poc
+      ansible.builtin.file:
+        path: "/usr/share/llm/{{ item }}"
+        state: directory
+      loop:
+        - langflow
+        - langchain-poc
+    - name: Install requirements for langflow
+      ansible.builtin.pip:
+        virtualenv: /usr/share/llm/langflow/.langflow-venv
+        name:
+          - langflow
+          - instructorembedding
+          - sentence-transformers
+    - name: Install requirements for langchain-poc
+      ansible.builtin.pip:
+        virtualenv: /usr/share/llm/langchain-poc/.langchain-poc
+        name:
+          - xformers
+          - instructorembedding
+          - sentence-transformers
+          - torchvision
+          - torchaudio
+          - faiss-gpu
+          - langchain[llms]
+          - weaviate-client
+          - chainlit
+          - pypdf
+          - tiktoken
+    - name: Clone chainlit cookbook
+      ansible.builtin.git:
+        repo: https://github.com/Chainlit/cookbook.git
+        dest: /usr/share/llm/langchain-poc/chainlit-cookbook
+        clone: true
+        force: true
+    - name: Install packagecloud signing key
+      ansible.builtin.get_url:
+        url: https://packagecloud.io/github/git-lfs/gpgkey
+        dest: /etc/apt/trusted.gpg.d/packagecloud.asc
+        mode: 644
+        force: true
+      become: true
+    - name: Add packagecloud repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/trusted.gpg.d/packagecloud.asc] https://packagecloud.io/github/git-lfs/ubuntu/ jammy main"
+        state: present
+        update_cache: true
+      become: true
+    - name: Install git-lfs
+      ansible.builtin.apt:
+        name: git-lfs
+        state: present
+      become: true
+    - name: Enable git lfs
+      ansible.builtin.command:
+        cmd: git lfs install
+    # to run chainlit app - chainlit run app.py -w
     #- name: Run make_db.py
     #  ansible.builtin.shell:
     #    chdir: /usr/share/llm/h2ogpt
@@ -120,6 +170,11 @@
         - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-GPTQ && deactivate
         - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-40b-v2-GPTQ && deactivate
         - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py amazon/FalconLite && deactivate
-# CHECK OUT WEAVIATE AS A NEXT STEP FOR INSTALLATION
-
-# to start, follow instructions for generate.py here https://github.com/h2oai/h2ogpt/blob/main/docs/README_LINUX.md
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/Vicuna-33B-GPTQ && deactivate
+        - source /usr/share/llm/.llm-venv/bin/activate && python download-model.py TheBloke/Vicuna-33B-1-3-SuperHOT-8K-GPTQ && deactivate
+    - name: Clone hkunlp/instructor-xl into a shared models directory
+      ansible.builtin.git:
+        repo: https://huggingface.co/hkunlp/instructor-xl
+        dest: /usr/share/llm/models/hkunlp_instructor-xl
+        clone: true
+        force: true
