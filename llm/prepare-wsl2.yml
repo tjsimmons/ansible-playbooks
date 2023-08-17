@@ -1,7 +1,6 @@
 - name: Install necessary drivers for CUDA on Ubuntu 22.04 under WSL2, meant to be run in the WSL installation hosting h2ogpt
   hosts: "{{ variable_host | default('h2o-wsl') }}"
   # from https://ubuntu.com/tutorials/enabling-gpu-acceleration-on-ubuntu-on-wsl2-with-the-nvidia-cuda-platform
-
   tasks:
     - name: Install some requirements
       ansible.builtin.apt:
@@ -73,6 +72,12 @@
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
         - export CUDA_HOME=/usr/local/cuda
         - export PATH=$PATH:/usr/local/cuda/bin/
+      become: true
+    - name: Add the docker group to the current user
+      ansible.builtin.user:
+        groups: docker
+        name: "{{ ansible_env.USER }}"
+        append: true
       become: true
     #- name: Clone bitsandbytes
     #  ansible.builtin.git:

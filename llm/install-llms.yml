@@ -108,7 +108,7 @@
           - sentence-transformers
     - name: Install requirements for langchain-poc
       ansible.builtin.pip:
-        virtualenv: /usr/share/llm/langchain-poc/.langchain-poc
+        virtualenv: /usr/share/llm/langchain-poc/.poc
         name:
           - xformers
           - instructorembedding
