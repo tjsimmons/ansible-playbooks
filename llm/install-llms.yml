@@ -64,7 +64,7 @@
         repo: https://github.com/oobabooga/text-generation-webui.git
         dest: /usr/share/llm/text-generation-webui
         clone: true
-        force: true
+        update: false
     - name: Install text-generation-webui dependencies
       ansible.builtin.pip:
         chdir: /usr/share/llm/text-generation-webui
@@ -78,7 +78,6 @@
         name:
           - auto-gptq
           - exllama
-          - llama-cpp-python
           - llama-cpp-python-cuda
     - name: Install standalone pip modules
       ansible.builtin.pip:
@@ -120,6 +119,7 @@
           - tiktoken
           - unstructured[all-docs]
           - pytesseract
+          - jq
     - name: Clone chainlit cookbook
       ansible.builtin.git:
         repo: https://github.com/Chainlit/cookbook.git
@@ -181,9 +181,16 @@
         repo: https://huggingface.co/hkunlp/instructor-xl
         dest: /usr/share/llm/models/hkunlp_instructor-xl
         clone: true
-        force: true
+        update: false
     - name: Run Python module nltk.downloader for the poc
       ansible.builtin.shell:
         chdir: /usr/share/llm/poc
         cmd: "source /usr/share/llm/poc/.venv/bin/activate && python3 -m nltk.downloader all && deactivate"
         executable: /usr/bin/bash
+    - name: Clone airbyte repo to use with docker-compose
+      ansible.builtin.git:
+        repo: https://github.com/airbytehq/airbyte.git
+        dest: /usr/share/llm/airbyte
+        clone: true
+        update: false
+        force: true

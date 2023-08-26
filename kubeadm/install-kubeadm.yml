@@ -1,128 +1,136 @@
-- hosts: kubernetes
+- name: Install k8s
+  hosts: kubernetes
   become: true
-  become_user: root
-  gather_facts: yes
+  gather_facts: true
   tasks:
-    - name: add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        id: 0EBFCD88
+    # - name: add Docker GPG key
+    #  apt_key:
+    #    url: https://download.docker.com/linux/ubuntu/gpg
+    #    id: 0EBFCD88
+    #    state: present
+    # - name: add Docker repo
+    #  apt_repository:
+    #    repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+    # - name: install Docker
+    #  apt:
+    #    name:
+    #      - docker-ce
+    #      - docker-ce-cli
+    #      - containerd.io
+    #      - docker-buildx-plugin
+    #      - docker-compose-plugin
+    #    update-cache: true
+    #    state: present
+    #    force: true
+    - name: Add kubernetes gpg key
+      ansible.builtin.get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key
+        dest: /etc/apt/trusted.gpg.d/k8s.asc
+        mode: u+rwx
+        force: true
+    - name: Add kubernetes apt repository
+      ansible.builtin.apt_repository:
+        repo: deb https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /
+    - name: Install kubectl, kubelet, and kubeadm
+      ansible.builtin.apt:
+        name:
+          - kubectl
+          - kubelet
+          - kubeadm
+        update-cache: true
         state: present
-    - name: add Docker repo
-      apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu xenial stable
-    - name: install Docker
-      apt:
-        name: "docker-ce=17.03.2*"
-        update-cache: yes
-        state: present
-        force: yes
-    - name: add kubernetes gpg key
-      apt_key:
-        url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
-        state: present
-    - name: add kubernetes apt repository
-      apt_repository:
-        repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
-    - name: install kubectl, kubelet, and kubeadm
-      apt:
-        name: "{{ item }}"
-        update-cache: yes
-        state: present
-      with_items:
-        - kubectl
-        - kubelet
-        - kubeadm
 
-- hosts: kubernetes-master
+- name: Set up kubectl on master
+  hosts: kubernetes_master
   become_user: root
   tasks:
-    - name: "install Go"
+    - name: Install Go
       become: true
-      unarchive:
-        src: https://dl.google.com/go/go1.10.2.linux-amd64.tar.gz
+      ansible.builtin.unarchive:
+        src: https://dl.google.com/go/go1.21.0.linux-amd64.tar.gz
         dest: /usr/local
-        remote_src: yes
+        remote_src: true
     - name: "Add Go to system PATH"
       become: true
-      lineinfile:
+      ansible.builtin.lineinfile:
         path: /etc/profile
         line: "export PATH=$PATH:/usr/local/go/bin"
         state: present
-    - name: "install crictl"
+    - name: Install crictl
       become: true
-      command: "go get github.com/kubernetes-incubator/cri-tools/cmd/crictl"
-    - name: "initialize kubeadm with flannel CIDR"
+      ansible.builtin.command: "go get github.com/kubernetes-incubator/cri-tools/cmd/crictl"
+    - name: Initialize kubeadm with flannel CIDR
       become: true
-      command: kubeadm init --pod-network-cidr=10.244.0.0/16
+      ansible.builtin.command: kubeadm init --pod-network-cidr=10.244.0.0/16
       when: ansible_local.kubeadm is undefined
       register: kubeadm_output
-    - name: "create .kube directory"
-      file:
+    - name: Create .kube directory
+      ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/.kube"
         owner: "{{ ansible_env.USER }}"
         group: "{{ ansible_env.USER }}"
         state: directory
       when: ansible_local.kubeadm is undefined
-    - name: "copy kube admin.conf to local .kube"
+    - name: Copy kube admin.conf to local .kube
       become: true
-      copy:
+      ansible.builtin.copy:
         remote_src: true
         src: /etc/kubernetes/admin.conf
         dest: "{{ ansible_env.HOME }}/.kube/config"
       when: ansible_local.kubeadm is undefined
-    - name: "install flannel networking"
-      command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+    - name: Iinstall flannel networking
+      ansible.builtin.command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
       when: ansible_local.kubeadm is undefined
-    - name: "save join command to disk"
-      copy:
+    - name: Save join command to disk
+      ansible.builtin.copy:
         content: "{{ kubeadm_output.stdout | regex_findall('kubeadm join --token .*', '\\1') | join('') }}"
         dest: "{{ ansible_env.HOME }}/kubeadm.join"
         owner: "{{ ansible_env.USER }}"
       when: ansible_local.kubeadm is undefined
-    - name: "pull down kubeadm.join"
-      fetch:
+    - name: Pull down kubeadm.join
+      ansible.builtin.fetch:
         src: "{{ ansible_env.HOME }}/kubeadm.join"
         dest: kubeadm.join
         flat: true
-    - name: "copy kubernetes config file to localhost"
+    - name: Copy kubernetes config file to localhost
       become: true
-      fetch:
+      ansible.builtin.fetch:
         src: /etc/kubernetes/admin.conf
         dest: ~/.kube/config
         flat: true
-    - name: "add kubeadm fact to the system"
-      copy:
+    - name: Add kubeadm fact to the system
+      ansible.builtin.copy:
         src: facts.d/kubeadm.fact
         dest: /etc/ansible/facts.d/
         owner: "{{ ansible_env.USER }}"
       become: true
       when: ansible_local.kubeadm is undefined
 
-- hosts: kubernetes-node
+- name: Join nodes to master
+  hosts: kubernetes_node
   become_user: root
   tasks:
-    - name: "place kubeadm.join command"
-      copy:
+    - name: Place kubeadm.join command
+      ansible.builtin.copy:
         src: kubeadm.join
         dest: "{{ ansible_env.HOME }}/kubeadm.join"
         owner: "{{ ansible_env.USER }}"
+        mode: u+rwx
       when: ansible_local.kubeadm is undefined
-    - name: "store kubeadm join command"
-      command: "cat {{ ansible_env.HOME }}/kubeadm.join"
+    - name: Store kubeadm join command
+      ansible.builtin.command: "cat {{ ansible_env.HOME }}/kubeadm.join"
       register: kubeadm_join
       when: ansible_local.kubeadm is undefined
-    - name: "execute kubeadm join"
-      command: "{{ kubeadm_join.stdout }}"
+    - name: Execute kubeadm join
+      ansible.builtin.command: "{{ kubeadm_join.stdout }}"
       become: true
       when: ansible_local.kubeadm is undefined
       register: join_output
-    - name: "add kubeadm fact to the system"
-      copy:
+    - name: Add kubeadm fact to the system
+      ansible.builtin.copy:
         src: facts.d/kubeadm.fact
         dest: /etc/ansible/facts.d/
         owner: "{{ ansible_env.USER }}"
+        mode: u+rwx
       become: true
       when: ansible_local.kubeadm is undefined
-
-

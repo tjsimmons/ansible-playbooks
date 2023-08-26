@@ -1,0 +1,26 @@
+- name: Uninstall k8s
+  hosts: kubernetes
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Uninstall Docker
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        update-cache: true
+        state: absent
+        force: true
+    - name: Remove Docker repo
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+        state: absent
+    - name: Remove Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        id: 0EBFCD88
+        state: absent
