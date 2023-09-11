@@ -92,16 +92,22 @@
       ansible.builtin.file:
         path: "/usr/share/llm/{{ item }}"
         state: directory
+        owner: "{{ ansible_env.USER }}"
+        group: "{{ ansible_env.USER }}"
+        mode: u+wrx,o+r
       loop:
         - langflow
         - poc
     - name: Install requirements for langflow
       ansible.builtin.pip:
-        virtualenv: /usr/share/llm/langflow/.venv
+        chdir: /usr/share/llm/langflow
+        virtualenv: .venv
         name:
           - langflow
           - instructorembedding
           - sentence-transformers
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
     - name: Install requirements for poc
       ansible.builtin.pip:
         virtualenv: /usr/share/llm/poc/.venv
@@ -120,6 +126,10 @@
           - unstructured[all-docs]
           - pytesseract
           - jq
+          - chromadb
+          - lark
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
     - name: Clone chainlit cookbook
       ansible.builtin.git:
         repo: https://github.com/Chainlit/cookbook.git
@@ -193,4 +203,27 @@
         dest: /usr/share/llm/airbyte
         clone: true
         update: false
-        force: true
+    - name: Clone my custom connector for airbyte
+      ansible.builtin.git:
+        repo: ssh://git@github.com/tjsimmons/airbyte-destination-langchain-hfembed-weaviate.git
+        dest: "{{ ansible_env.HOME }}/destination-langchain-hfembed-weaviate"
+        update: false
+    - name: Create virtual env for custom connector and install requirements
+      ansible.builtin.pip:
+        chdir: "{{ ansible_env.HOME }}/destination-langchain-hfembed-weaviate"
+        virtualenv: .venv
+        requirements: requirements.txt
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
+    - name: Clone haystack for installation
+      ansible.builtin.git:
+        repo: https://github.com/deepset-ai/haystack.git
+        dest: /usr/share/llm/haystack
+        clone: true
+        version: v1.20.0
+    - name: Install haystack
+      ansible.builtin.pip:
+        virtualenv: /usr/share/llm/poc/.venv
+        chdir: /usr/share/llm/haystack
+        editable: true
+        name: .[all]
