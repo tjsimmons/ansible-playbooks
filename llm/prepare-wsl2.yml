@@ -1,5 +1,5 @@
-- name: Install necessary drivers for CUDA on Ubuntu 22.04 under WSL2, meant to be run in the WSL installation hosting h2ogpt
-  hosts: "{{ variable_host | default('h2o-wsl') }}"
+- name: Install necessary drivers for CUDA on Ubuntu 22.04 under WSL2, meant to be run in the WSL installation hosting LLMs
+  hosts: "{{ variable_host | default('llm') }}"
   # from https://ubuntu.com/tutorials/enabling-gpu-acceleration-on-ubuntu-on-wsl2-with-the-nvidia-cuda-platform
   tasks:
     - name: Update installed apt packages
@@ -90,25 +90,6 @@
         name: "{{ ansible_env.USER }}"
         append: true
       become: true
-    #- name: Clone bitsandbytes
-    #  ansible.builtin.git:
-    #    repo: https://github.com/timdettmers/bitsandbytes.git
-    #    dest: "{{ ansible_env.HOME }}/bitsandbytes"
-    #    clone: true
-    #    version: 0.41.0
-    #- name: Build bitsandbytes
-    #  community.general.make:
-    #    chdir: "{{ ansible_env.HOME }}/bitsandbytes"
-    #    target: cuda12x
-    #    params:
-    #      CUDA_VERSION: 122
-    #  environment:
-    #    PATH: "{{ ansible_env.PATH }}:/usr/local/cuda/bin"
-    #- name: Install bitsandbytes via python
-    #  ansible.builtin.command:
-    #    chdir: "{{ ansible_env.HOME }}/bitsandbytes"
-    #    cmd: /usr/bin/python3 setup.py install
-    #  become: true
     - name: Ensure CUDA works by compiling a sample app
       ansible.builtin.git:
         repo: https://github.com/nvidia/cuda-samples.git

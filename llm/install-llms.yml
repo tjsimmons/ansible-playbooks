@@ -1,30 +1,7 @@
 - name: Install llm
   hosts: "{{ variable_host | default('llm') }}"
-  # can override the host by using ansible-playbook install-h2ogpt.yml --extra-vars "variable_host={target}"
-  #vars_prompt:
-  #  - name: api_token
-  #    prompt: Enter the huggingface.co API token
+  # can override the host by using ansible-playbook install-llms.yml --extra-vars "variable_host={target}"
   tasks:
-    - name: Install requirements
-      ansible.builtin.apt:
-        name:
-          - libmagic-dev
-          - poppler-utils
-          - tesseract-ocr
-          - libtesseract-dev
-          - libreoffice
-          - libxml2
-          - pandoc
-        update_cache: true
-        state: present
-      become: true
-    - name: Clone h2ogpt repository
-      ansible.builtin.git:
-        repo: https://github.com/h2oai/h2ogpt.git
-        dest: /usr/share/llm/h2ogpt
-        clone: true
-        force: true
-      become: true
     - name: Change owner of /usr/share/llm to current user
       ansible.builtin.file:
         dest: /usr/share/llm
@@ -33,27 +10,6 @@
         mode: u+rwx
         recurse: true
       become: true
-    - name: Create and activate llm virtualenv and install requirements, including optionals
-      ansible.builtin.pip:
-        chdir: /usr/share/llm/h2ogpt
-        virtualenv: /usr/share/llm/.venv
-        extra_args: --extra-index https://download.pytorch.org/whl/nightly/cu121
-        requirements: "{{ item }}"
-      environment:
-        PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
-      loop:
-        - requirements.txt
-        - reqs_optional/requirements_optional_langchain.txt
-        - reqs_optional/requirements_optional_gpt4all.txt
-        - reqs_optional/requirements_optional_langchain.gpllike.txt
-        - reqs_optional/requirements_optional_langchain.urls.txt
-    - name: Install pytesseract via pip into llm venv
-      ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: /usr/share/llm/.venv
-        name:
-          - pytesseract
-        state: present
     - name: Set the git credential helper as the default, so we can store the huggingface-cli token
       community.general.git_config:
         name: credential.helper
@@ -65,30 +21,34 @@
         dest: /usr/share/llm/text-generation-webui
         clone: true
         update: false
+        version: v1.5
     - name: Install text-generation-webui dependencies
       ansible.builtin.pip:
         chdir: /usr/share/llm/text-generation-webui
         virtualenv: /usr/share/llm/.venv
+        extra_args: --extra-index https://download.pytorch.org/whl/nightly/cu121
         requirements: requirements.txt
-    - name: Remove pip modules to be installed standalone
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
+    - name: Clone fastchat
+      ansible.builtin.git:
+        repo: https://github.com/lm-sys/FastChat.git
+        dest: /usr/share/llm/fastchat
+        clone: true
+        update: false
+        version: v0.2.29
+    - name: Install a few fastchat requirements
       ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: .venv
-        state: absent
+        virtualenv: /usr/share/llm/fastchat/.fastchat
         name:
-          - auto-gptq
-          - exllama
-          - llama-cpp-python-cuda
-    - name: Install standalone pip modules
+          - bitsandbytes
+          - scipy
+    - name: Install fastchat requirements in editable
       ansible.builtin.pip:
-        chdir: /usr/share/llm
-        virtualenv: .venv
-        extra_args: --use-deprecated=legacy-resolver --no-cache-dir
-        name:
-          - https://s3.amazonaws.com/artifacts.h2o.ai/deps/h2ogpt/auto_gptq-0.3.0-cp310-cp310-linux_x86_64.whl
-          - https://github.com/jllllll/exllama/releases/download/0.0.8/exllama-0.0.8+cu118-cp310-cp310-linux_x86_64.whl
-          - https://github.com/jllllll/llama-cpp-python-cuBLAS-wheels/releases/download/textgen-webui/llama_cpp_python_cuda-0.1.73+cu117-cp310-cp310-linux_x86_64.whl
-    - name: Make a directory for langflow and poc
+        virtualenv: /usr/share/llm/fastchat/.fastchat
+        editable: true
+        name: ".[model_worker,webui]"
+    - name: Make a directory for poc
       ansible.builtin.file:
         path: "/usr/share/llm/{{ item }}"
         state: directory
@@ -96,51 +56,28 @@
         group: "{{ ansible_env.USER }}"
         mode: u+wrx,o+r
       loop:
-        - langflow
         - poc
-    - name: Install requirements for langflow
-      ansible.builtin.pip:
-        chdir: /usr/share/llm/langflow
-        virtualenv: .venv
-        name:
-          - langflow
-          - instructorembedding
-          - sentence-transformers
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
     - name: Install requirements for poc
       ansible.builtin.pip:
-        virtualenv: /usr/share/llm/poc/.venv
+        virtualenv: /usr/share/llm/poc/.poc
+        extra_args: --extra-index https://download.pytorch.org/whl/nightly/cu121
         name:
-          - xformers
-          - instructorembedding
           - sentence-transformers
-          - torchvision
-          - torchaudio
-          - faiss-gpu
-          - langchain[llms]
           - weaviate-client
-          - chainlit
-          - pypdf
           - tiktoken
-          - unstructured[all-docs]
-          - pytesseract
           - jq
-          - chromadb
-          - lark
+          - farm-haystack[all-gpu]
+          - vllm
+          - vllm-haystack
+          - einops
+          - chainlit
       environment:
         PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
-    - name: Clone chainlit cookbook
-      ansible.builtin.git:
-        repo: https://github.com/Chainlit/cookbook.git
-        dest: /usr/share/llm/poc/chainlit-cookbook
-        clone: true
-        force: true
     - name: Install packagecloud signing key
       ansible.builtin.get_url:
         url: https://packagecloud.io/github/git-lfs/gpgkey
         dest: /etc/apt/trusted.gpg.d/packagecloud.asc
-        mode: 0644
+        mode: a+rwx
         force: true
       become: true
     - name: Add packagecloud repository
@@ -161,69 +98,4 @@
       ansible.builtin.copy:
         src: weaviate/
         dest: /usr/share/llm/weaviate/
-        mode: 0755
-    # to run chainlit app - chainlit run app.py -w
-    #- name: Run make_db.py
-    #  ansible.builtin.shell:
-    #    chdir: /usr/share/llm/h2ogpt
-    #    cmd:
-    #      "source /usr/share/llm/.venv/bin/activate && huggingface-cli login --token {{ api_token }} --add-to-git-credential &&
-    #      python3 src/make_db.py --download_some=true --enable_ocr=true && deactivate"
-    #    executable: /usr/bin/bash
-    - name: Download various models for text-generation-webui
-      ansible.builtin.shell:
-        chdir: /usr/share/llm/text-generation-webui
-        cmd: "{{ item}}"
-        executable: /usr/bin/bash
-      loop:
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/OpenAssistant-Llama2-13B-Orca-v2-8K-3166-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/OpenChat_v3.2-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/CodeUp-Llama-2-13B-Chat-HF-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/OpenOrcaxOpenChat-Preview2-13B-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/Llama-2-13B-chat-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-7b-v3-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/h2ogpt-gm-oasst1-en-2048-falcon-40b-v2-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py amazon/FalconLite && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/Vicuna-33B-GPTQ && deactivate
-        - source /usr/share/llm/.venv/bin/activate && python download-model.py TheBloke/Vicuna-33B-1-3-SuperHOT-8K-GPTQ && deactivate
-    - name: Clone hkunlp/instructor-xl into a shared models directory
-      ansible.builtin.git:
-        repo: https://huggingface.co/hkunlp/instructor-xl
-        dest: /usr/share/llm/models/hkunlp_instructor-xl
-        clone: true
-        update: false
-    - name: Run Python module nltk.downloader for the poc
-      ansible.builtin.shell:
-        chdir: /usr/share/llm/poc
-        cmd: "source /usr/share/llm/poc/.venv/bin/activate && python3 -m nltk.downloader all && deactivate"
-        executable: /usr/bin/bash
-    - name: Clone airbyte repo to use with docker-compose
-      ansible.builtin.git:
-        repo: https://github.com/airbytehq/airbyte.git
-        dest: /usr/share/llm/airbyte
-        clone: true
-        update: false
-    - name: Clone my custom connector for airbyte
-      ansible.builtin.git:
-        repo: ssh://git@github.com/tjsimmons/airbyte-destination-langchain-hfembed-weaviate.git
-        dest: "{{ ansible_env.HOME }}/destination-langchain-hfembed-weaviate"
-        update: false
-    - name: Create virtual env for custom connector and install requirements
-      ansible.builtin.pip:
-        chdir: "{{ ansible_env.HOME }}/destination-langchain-hfembed-weaviate"
-        virtualenv: .venv
-        requirements: requirements.txt
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/home/{{ ansible_env.USER }}/.local/bin"
-    - name: Clone haystack for installation
-      ansible.builtin.git:
-        repo: https://github.com/deepset-ai/haystack.git
-        dest: /usr/share/llm/haystack
-        clone: true
-        version: v1.20.0
-    - name: Install haystack
-      ansible.builtin.pip:
-        virtualenv: /usr/share/llm/poc/.venv
-        chdir: /usr/share/llm/haystack
-        editable: true
-        name: .[all]
+        mode: a+rwx
